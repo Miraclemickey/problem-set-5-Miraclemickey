@@ -1,0 +1,137 @@
+### Scraping web data behind web forms
+
+The most difficult scenario for web scraping is when data is hidden behind multiple pages that can only be accessed entering information into web forms. There are a few approaches that might work in these cases, with varying degree of difficulty and reliability, but in my experience the best method is to use [Selenium](https://en.wikipedia.org/wiki/Selenium_(software)).
+
+Selenium automates web browsing sessions, and was originally designed for testing purposes. You can simulate clicks, enter information into web forms, add some waiting time between clicks, etc. To learn how it works, we will scrape a heavily javascripted website of 2017 General Election results. (You can download the information from the governemnt websites, but well, this is an example.)
+
+```{r}
+url <- 'https://www.theguardian.com/politics/ng-interactive/2017/jun/08/live-uk-election-results-in-full-2017'
+```
+
+As you can see, the information we want to scrape is dynamically displayed by putting information in the search field. By checking the website source, you can confirm that the information is not in the html but rendered dynamically when you select a particular url.
+
+The first step is to load the RSelenium. Then, we will start a browser running in the background. I will use Google Chrome, but Firefox should work.
+
+```{r}
+library(RSelenium)
+library(tidyverse)
+library(stringi)
+library(rvest)
+library(xml2)
+```
+
+
+Start selenium server in chrome
+```{r}
+driver<- rsDriver(browser=c("chrome"))
+browser <- driver[["client"]]
+browser$navigate(url)
+```
+
+Here's how we would check that it worked:
+
+```{r}
+src <- browser$getPageSource()
+substr(src, 1, 1000)
+```
+
+First thing first, the following code will remove the cookie banner at the bottom.
+
+```{r}
+cookie_button <- browser$findElement(using = 'css selector', value = "")
+cookie_button$clickElement()
+```
+
+First, the search element has to be shown in the screen. So, let's scroll. 
+
+```{r}
+webElem <- browser$findElement("css", "body")
+#webElem$sendKeysToElement(list(key = ""))
+```
+
+Let's assume we want to see the results of the constituency here. We can feed post code, and check the results.  First, let's use selectorGadget to identify the elements that we're trying to scrape. Then, send the text to the field and "enter" key inputs.
+
+```{R}
+## identify the ndoe for input
+
+## send the post code ("WC2A 2AE")
+
+## This is a tricky part, we need to wait until a suggestion shows up
+while(browser$findElement(using = 'class name', value = 'ge-lookup__suggestions')$getElementText() %>% nchar() == 0) {
+  Sys.sleep(1)
+}
+
+## mock the click "enter"
+
+```
+
+Now that we have the results table displayed, we will scrape the name of constituency and the table.
+
+```{r}
+## get the constituency name
+const_name 
+
+## get the div with the result information
+res_div 
+
+## what we can do here is identify the root node where the results are displayed
+## and then you can hand the html from browser to 
+## rvest and use familer html_table() function
+## get the html of the table, then parse it using rvest's "html_table"
+
+```
+
+The first column of the table was supposedly for the party. But that information is not coming through, because it's just blank `<td>` tags. We still can extract the information by using the class information attached. 
+
+```{r}
+party_class 
+## remove unnecessary part and get abbreviated party name
+party
+print(party)
+```
+
+Now, let's create a `data.frame`.
+
+```{R}
+## create constituency and party variable, the select the variables to keep
+
+
+print(results_table)
+```
+
+
+We think that we have identified the necessary steps to get the data. We can now go over the list of constituency names and get all candidate data.
+
+First, enerate a function to search with constituency name and get the table
+```{r}
+get_results_by_const <- function(const_name, sec = 4){
+  
+  
+  Sys.sleep(sec)
+  return(results_table)
+}
+
+```
+
+Now, we get the name of constituencies from an excel file.
+
+```{R}
+library(readxl)
+const_data <- read_xls("SAPE20DT7-mid-2017-parlicon-syoa-estimates-unformatted.xls", sheet = 4, skip = 4)
+# replace "and" with "&"
+const_data$PCON11NM <- sub("\\band\\b", "&", const_data$PCON11NM)
+```
+
+Run the loop. 
+
+```{R}
+
+```
+
+(or alternatively, `lapply` + `bind_rows` would be easier)
+
+```{R}
+data_all <- lapply(const_data$PCON11NM[1:3], get_results_by_const) %>% bind_rows()
+head(data_all)
+```
+
